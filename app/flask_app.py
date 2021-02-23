@@ -7,9 +7,15 @@ import model
 import orm
 import repository
 
+
+def is_valid_sku(sku, batches):
+    return sku in {b.sku for b in batches}
+
+
 orm.start_mappers()
 get_session = sessionmaker(bind=create_engine(config.get_postgres_uri()))
 app = Flask(__name__)
+
 
 @app.route("/allocate", methods=['POST'])
 def allocate_endpoint():
@@ -20,6 +26,14 @@ def allocate_endpoint():
         request.json['sku'],
         request.json['qty'],
     )
-    batchref = model.allocate(line, batches)
 
+    if not is_valid_sku(line.sku, batches):
+        return jsonify({'message': f'Invalid SKU {line.sku}'}), 400
+
+    try:
+        batchref = model.allocate(line, batches)
+    except model.OutOfStock as e:
+        return jsonify({'message': str(e)}), 400
+
+    session.commit()
     return jsonify({'batchref': batchref}), 201
