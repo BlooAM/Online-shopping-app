@@ -2,7 +2,10 @@ from flask import Flask, jsonify, request
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app import config, model, orm, repository, services
+import config
+from domain import model
+from adapters import orm, repository
+from service_layer import services
 
 
 orm.start_mappers()

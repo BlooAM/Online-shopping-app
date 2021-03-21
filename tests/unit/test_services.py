@@ -1,5 +1,6 @@
-from app import model
-from app.repository import FakeRepository
+from adapters.repository import FakeRepository
+from domain import model
+from service_layer import services
 
 
 class FakeSession:

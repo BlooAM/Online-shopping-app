@@ -1,6 +1,6 @@
 import collections as abc
 
-from app import model
+from domain import model
 
 
 class AbstractRepository(abc.ABC):

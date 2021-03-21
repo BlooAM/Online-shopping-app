@@ -1,4 +1,5 @@
-from app import model, repository
+from domain import model
+from adapters import repository
 
 
 def test_repository_can_save_a_batch(session):
