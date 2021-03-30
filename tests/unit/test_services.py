@@ -1,4 +1,8 @@
+import pytest
+from datetime import date, timedelta
+
 from adapters.repository import FakeRepository
+from domain.model import Batch, OrderLine, allocate, OutOfStock
 from domain import model
 from service_layer import services
 
@@ -11,13 +15,84 @@ class FakeSession:
         self.commited = True
 
 
+class FakeRepository(set):
+    @staticmethod
+    def for_batch(ref, sku, qty, eta=None):
+        return FakeRepository([
+            model.Batch(ref, sku, qty, eta)
+        ])
+
+
+today = date.today()
+tomorrow = today + timedelta(days=1)
+later = tomorrow + timedelta(days=10)
+
+
+def test_add_batch():
+    repo, session = FakeRepository([]), FakeSession()
+    services.add_batch("b1", "CRUNCHY-ARMCHAIR", 100, None, repo, session)
+    assert repo.get("b1") is not None
+    assert session.committed
+
+def test_prefers_current_stock_batches_to_shipments():
+    in_stock_batch = Batch("in-stock-batch", "RETRO-CLOCK", 100, eta=None)
+    shipment_batch = Batch("shipment-batch", "RETRO-CLOCK", 100, eta=tomorrow)
+    line = OrderLine("oref", "RETRO-CLOCK", 10)
+    allocate(line, [in_stock_batch, shipment_batch])
+
+    assert in_stock_batch.available_quantity == 90
+    assert shipment_batch.available_quantity == 100
+
+
+def test_prefers_warehouse_batches_to_shipments():
+    in_stock_batch = Batch("in-stock-batch", "RETRO-CLOCK", 100, eta=None)
+    shipment_batch = Batch("shipment-batch", "RETRO-CLOCK", 100, eta=tomorrow)
+    repo = FakeRepository([in_stock_batch, shipment_batch])
+    session = FakeSession()
+
+    line = OrderLine('oref', "RETRO-CLOCK", 10)
+    services.allocate(line, repo, session)
+
+    assert in_stock_batch.available_quantity == 90
+    assert shipment_batch.available_quantity == 100
+
+
+def test_prefers_earlier_batches():
+    earliest = Batch("speedy-batch", "MINIMALIST-SPOON", 100, eta=today)
+    medium = Batch("normal-batch", "MINIMALIST-SPOON", 100, eta=tomorrow)
+    latest = Batch("slow-batch", "MINIMALIST-SPOON", 100, eta=later)
+    line = OrderLine("order1", "MINIMALIST-SPOON", 10)
+    allocate(line, [medium, earliest, latest])
+
+    assert earliest.available_quantity == 90
+    assert medium.available_quantity == 100
+    assert latest.available_quantity == 100
+
+
+def test_returns_allocated_batch_ref():
+    in_stock_batch = Batch("in-stock-batch-ref", "HIGHBROW-POSTER", 100, eta=None)
+    shipment_batch = Batch("shipment-batch-ref", "HIGHBROW-POSTER", 100, eta=tomorrow)
+    line = OrderLine("oref", "HIGHBROW-POSTER", 10)
+    allocation = allocate(line, [in_stock_batch, shipment_batch])
+
+    assert allocation == in_stock_batch.reference
+
+
+def test_raises_out_of_stock_exception_if_cannot_allocate():
+    batch = Batch('batch1', 'SMALL-FORK', 10, eta=today)
+    allocate(OrderLine('order1', 'SMALL-FORK', 10), [batch])
+
+    with pytest.raises(OutOfStock, match='SMALL-FORK'):
+        allocate(OrderLine('order2', 'SMALL-FORK', 1), [batch])
+
+
 def test_commits():
     line = model.OrderLine("o1", "OMINOUS-MIRROR", 10)
     batch = model.Batch("b1", "OMINOUS-MIRROR", 100, eta=None)
     repo = FakeRepository([batch])
     session = FakeSession()
 
-    services.allocate(line, repo, session)
+    services.allocate("o1", "OMINOUS-MIRROR", 10, repo, session)
     assert session.committed is True
 
 
@@ -26,7 +101,7 @@ def test_returns_allocation():
     batch = model.Batch("b1", "COMPLICATED-LAMP", 100, eta=None)
     repo = FakeRepository([batch])
 
-    result = services.allocate(line, repo, FakeSession())
+    result = services.allocate("o1", "COMPLICATED-LAMP", 10, repo, FakeSession())
     assert result == "b1"
 
 
@@ -36,4 +111,4 @@ def test_error_for_invalid_sku():
     repo = FakeRepository([batch])
 
     with pytest.raises(services.InvalidSku, match="Invalid name of SKU: NONEXISTENTSKU"):
-        services.allocate(line, repo, FakeSession())
+        services.allocate("o1", "NONEXISTENTSKU", 10, repo, FakeSession())
