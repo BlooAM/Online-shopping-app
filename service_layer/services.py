@@ -14,8 +14,7 @@ def is_valid_sku(sku, batches):
 
 
 def add_batch(
-        ref: str, sku: str, qty: int, eta: Optional[date],
-        repo: AbstractRepository, session
+        ref: str, sku: str, qty: int, eta: Optional[date], repo: AbstractRepository, session
 ):
     repo.add(model.Batch(ref, sku, qty, eta))
     session.commit()
