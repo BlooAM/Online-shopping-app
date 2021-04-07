@@ -21,12 +21,10 @@ def add_batch(
 
 
 def allocate(
-        orderid: str, sku: str, qty: int, repo: AbstractRepository, session
+        orderid: str, sku: str, qty: int, uow: unit_of_work.AbstractUnitOfWork
 ) -> str:
-    batches = repo.list()
     line = OrderLine(orderid, sku, qty)
-    if not is_valid_sku(line.sku, batches):
-        raise InvalidSku(f'Invalid sku {line.sku}')
-    batchref = model.allocate(line, batches)
-    session.commit()
-    return batchref
+    with uow:
+        batches = uow.batches.list()
+        batchref = model.allocate(line, batches)
+        uow.commit()

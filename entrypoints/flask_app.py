@@ -24,7 +24,6 @@ def allocate_endpoint():
         request.json['sku'],
         request.json['qty'],
     )
-
     try:
         batchref = services.allocate(line, repo, session)
     except (model.OutOfStock, services.InvalidSku) as e:
