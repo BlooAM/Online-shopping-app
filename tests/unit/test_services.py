@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from adapters.repository import FakeRepository
 from domain.model import Batch, OrderLine, allocate, OutOfStock
 from domain import model
-from service_layer import services
+from service_layer import services, unit_of_work
 
 
 class FakeSession:
@@ -23,16 +23,29 @@ class FakeRepository(set):
         ])
 
 
+class FakeUnitOfWork(unit_of_work.AbstractUnitOfWork):
+    def __init__(self):
+        self.batches = FakeRepository([])
+        self.committed = False
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        pass
+
+
 today = date.today()
 tomorrow = today + timedelta(days=1)
 later = tomorrow + timedelta(days=10)
 
 
 def test_add_batch():
-    repo, session = FakeRepository([]), FakeSession()
-    services.add_batch("b1", "CRUNCHY-ARMCHAIR", 100, None, repo, session)
-    assert repo.get("b1") is not None
-    assert session.committed
+    uow = FakeUnitOfWork()
+    services.add_batch("b1", "CRUNCHY-ARMCHAIR", 100, None, uow)
+    assert uow.batches.get("b1") is not None
+    assert uow.committed
+
 
 def test_prefers_current_stock_batches_to_shipments():
     in_stock_batch = Batch("in-stock-batch", "RETRO-CLOCK", 100, eta=None)
@@ -96,13 +109,11 @@ def test_commits():
     assert session.committed is True
 
 
-def test_returns_allocation():
-    line = model.OrderLine("o1", "COMPLICATED-LAMP", 10)
-    batch = model.Batch("b1", "COMPLICATED-LAMP", 100, eta=None)
-    repo = FakeRepository([batch])
-
-    result = services.allocate("o1", "COMPLICATED-LAMP", 10, repo, FakeSession())
-    assert result == "b1"
+def test_allocate_returns_allocation():
+    uow = FakeUnitOfWork()
+    services.add_batch("batch1", "COMPLICATED-LAMP", 100, None, uow)
+    result = services.allocate("o1", "COMPLICATED-LAMP", 10, uow)
+    assert result == "bach1"
 
 
 def test_error_for_invalid_sku():
