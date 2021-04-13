@@ -13,6 +13,17 @@ class AbstractRepository(abc.ABC):
         raise NotImplementedError
 
 
+class AbstractProductRepository(abc.ABC):
+    @abc.abstractmethod
+    def add(self, product):
+        raise NotImplementedError
+
+
+    @abc.abstractmethod
+    def get(self, sku) -> model.Product:
+        raise NotADirectoryError
+
+
 class SqlAlchemyRepository(AbstractRepository):
     def __init__(self, session):
         self.session = session
