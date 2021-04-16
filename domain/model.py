@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Optional, List
 
+from domain import events
 
 @dataclass(frozen=True)
 class OrderLine:
@@ -58,6 +59,7 @@ class Product:
         self.sku = sku
         self.batfches = batches
         self.version_number = version_number
+        self.events = []
 
     def allocate(self, line: OrderLine):
         try:
@@ -68,7 +70,8 @@ class Product:
             self.version += 1
             return batch.reference
         except StopIteration:
-            raise OutOfStock(f'No available SKU {line.sku}')
+            self.events.append(events.OutOfStock(line.sku))
+            return None
 
 
 class OutOfStock(Exception):
