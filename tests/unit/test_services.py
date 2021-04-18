@@ -1,7 +1,7 @@
 import pytest
 from datetime import date, timedelta
 
-from adapters.repository import FakeRepository
+from adapters import repository
 from domain.model import Batch, OrderLine, allocate, OutOfStock
 from domain import model
 from service_layer import services, unit_of_work
@@ -15,12 +15,16 @@ class FakeSession:
         self.commited = True
 
 
-class FakeRepository(set):
-    @staticmethod
-    def for_batch(ref, sku, qty, eta=None):
-        return FakeRepository([
-            model.Batch(ref, sku, qty, eta)
-        ])
+class FakeRepository(repository.AbstractRepository):
+    def __init__(self, products):
+        super().__init__()
+        self._products = set(products)
+
+    def _add(self, product):
+        self._products.add(product)
+
+    def _get(self, sku):
+        return next((p for p in self._products if p.sku == sku), None)
 
 
 class FakeUnitOfWork(unit_of_work.AbstractUnitOfWork):
@@ -28,7 +32,7 @@ class FakeUnitOfWork(unit_of_work.AbstractUnitOfWork):
         self.batches = FakeRepository([])
         self.committed = False
 
-    def commit(self):
+    def _commit(self):
         self.committed = True
 
     def rollback(self):

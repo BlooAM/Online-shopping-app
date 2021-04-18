@@ -4,13 +4,38 @@ from domain import model
 
 
 class AbstractRepository(abc.ABC):
+    def __init__(self):
+        self.seen = set()
+
+    def add(self, product: model.Product):
+        self._add(product)
+        self.seen.add(product)
+
+    def get(self, sku) -> model.Product:
+        product = self._get(sku)
+        if product:
+            self.seen.add(product)
+        return product
+
     @abc.abstractmethod
-    def add(self, batch: model.Batch):
+    def _add(self, product: model.Product):
         raise NotImplementedError
 
-    @abs.abstractmethod
-    def get(self, reference) -> model.Batch:
+    @abc.abstractmethod
+    def _get(self, sku) -> model.Product:
         raise NotImplementedError
+
+
+class SqlAlchemyRepository(AbstractRepository):
+    def __init__(self, session):
+        super().__init__()
+        self.session = session
+
+    def _add(self, product):
+        self.session.add(product)
+
+    def _get(self, sku):
+        return self.session.query(model.Product).filter_by(sku=sku).first()
 
 
 class AbstractProductRepository(abc.ABC):
@@ -21,32 +46,4 @@ class AbstractProductRepository(abc.ABC):
 
     @abc.abstractmethod
     def get(self, sku) -> model.Product:
-        raise NotADirectoryError
-
-
-class SqlAlchemyRepository(AbstractRepository):
-    def __init__(self, session):
-        self.session = session
-
-    def add(self, batch):
-        self.session.add(batch)
-
-    def get(self, reference):
-        return self.session.query(model.Batch).filter_by(reference=reference).one()
-
-    def lisst(self):
-        return self.session.query(model.Batch).all()
-
-
-class FakeRepository(AbstractRepository):
-    def __init__(self, batches):
-        self_batches = batches
-
-    def add(self, batch):
-        self._batches.add(batch)
-
-    def get(self, reference):
-        return next(b for b in self._batches if b.reference == reference)
-
-    def list(self):
-        return list(self._batches)
+        NotImplementedError
