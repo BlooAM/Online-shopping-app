@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from adapters import repository
 from domain.model import Batch, OrderLine, allocate, OutOfStock
 from domain import model
-from service_layer import services, unit_of_work
+from service_layer import handlers, unit_of_work
 
 
 class FakeSession:
@@ -46,7 +46,7 @@ later = tomorrow + timedelta(days=10)
 
 def test_add_batch():
     uow = FakeUnitOfWork()
-    services.add_batch("b1", "CRUNCHY-ARMCHAIR", 100, None, uow)
+    handlers.add_batch("b1", "CRUNCHY-ARMCHAIR", 100, None, uow)
     assert uow.batches.get("b1") is not None
     assert uow.committed
 
@@ -68,7 +68,7 @@ def test_prefers_warehouse_batches_to_shipments():
     session = FakeSession()
 
     line = OrderLine('oref', "RETRO-CLOCK", 10)
-    services.allocate(line, repo, session)
+    handlers.allocate(line, repo, session)
 
     assert in_stock_batch.available_quantity == 90
     assert shipment_batch.available_quantity == 100
@@ -109,14 +109,14 @@ def test_commits():
     repo = FakeRepository([batch])
     session = FakeSession()
 
-    services.allocate("o1", "OMINOUS-MIRROR", 10, repo, session)
+    handlers.allocate("o1", "OMINOUS-MIRROR", 10, repo, session)
     assert session.committed is True
 
 
 def test_allocate_returns_allocation():
     uow = FakeUnitOfWork()
-    services.add_batch("batch1", "COMPLICATED-LAMP", 100, None, uow)
-    result = services.allocate("o1", "COMPLICATED-LAMP", 10, uow)
+    handlers.add_batch("batch1", "COMPLICATED-LAMP", 100, None, uow)
+    result = handlers.allocate("o1", "COMPLICATED-LAMP", 10, uow)
     assert result == "bach1"
 
 
@@ -125,5 +125,5 @@ def test_error_for_invalid_sku():
     batch = model.Batch("b1", "AREALSKU", 100, eta=None)
     repo = FakeRepository([batch])
 
-    with pytest.raises(services.InvalidSku, match="Invalid name of SKU: NONEXISTENTSKU"):
-        services.allocate("o1", "NONEXISTENTSKU", 10, repo, FakeSession())
+    with pytest.raises(handlers.InvalidSku, match="Invalid name of SKU: NONEXISTENTSKU"):
+        handlers.allocate("o1", "NONEXISTENTSKU", 10, repo, FakeSession())

@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 import config
 from domain import model
 from adapters import orm, repository
-from service_layer import services
+from service_layer import handlers
 
 
 orm.start_mappers()
@@ -25,8 +25,8 @@ def allocate_endpoint():
         request.json['qty'],
     )
     try:
-        batchref = services.allocate(line, repo, session)
-    except (model.OutOfStock, services.InvalidSku) as e:
+        batchref = handlers.allocate(line, repo, session)
+    except (model.OutOfStock, handlers.InvalidSku) as e:
         return jsonify({'message': str(e)}), 400
 
     return jsonify({'batchref': batchref}), 201
@@ -39,7 +39,7 @@ def add_batch():
     eta = request.json['eta']
     if eta is not None:
         eta = datetime.fromisoformat(eta).date()
-    services.add_batch(
+    handlers.add_batch(
         request.json['ref'], request.json['sku'], request.json['qty'], eta, repo, session
     )
     return 'OK', 201
