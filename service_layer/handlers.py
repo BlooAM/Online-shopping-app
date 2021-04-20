@@ -1,6 +1,7 @@
+import email
 from datetime import date
 
-from domain import model
+from domain import model, events
 from domain.model import OrderLine
 from adapters.repository import AbstractRepository
 from service_layer import unit_of_work
@@ -15,25 +16,34 @@ def is_valid_sku(sku, batches):
 
 
 def add_batch(
-        ref: str, sku: str, qty: int, eta: Optional[date], uow: unit_of_work.AbstractUnitOfWork
+        event: events.BatchCreated, uow: unit_of_work.AbstractUnitOfWork
 ):
     with uow:
-        product = uow.products.get(sku=sku)
+        product = uow.products.get(sku=event.sku)
         if product is None:
-            product = model.Product(sku, batches=[])
+            product = model.Product(event.sku, batches=[])
             uow.products.add(product)
-        uow.batches.append(model.Batch(ref, sku, qty, eta))
+        uow.batches.append(model.Batch(event.ref, event.sku, event.qty, event.eta))
         uow.commit()
 
 
 def allocate(
-        orderid: str, sku: str, qty: int, uow: unit_of_work.AbstractUnitOfWork
+        event: events.AllocationRequired, uow: unit_of_work.AbstractUnitOfWork
 ) -> str:
-    line = OrderLine(orderid, sku, qty)
+    line = OrderLine(event.orderid, event.sku, event.qty)
     with uow:
-        product = uow.products.get(sku=sku)
+        product = uow.products.get(sku=event.sku)
         if product is None:
             raise InvalidSku(f'Invalid SKU {line.sku}')
         batchref = product.allocate(line)
         uow.commit()
         return batchref
+
+
+def send_out_of_stock_notification(
+        event: events.OutOfStock, uwo: unit_of_work.AbstractUnitOfWork
+):
+    email.send(
+        'stock@made.com',
+        f'No available {event.sku}',
+    )
