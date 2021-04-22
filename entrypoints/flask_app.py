@@ -5,9 +5,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 import config
-from domain import model
+from domain import model, events
 from adapters import orm, repository
-from service_layer import handlers
+from service_layer import handlers, unit_of_work, messagebus
 
 
 orm.start_mappers()
@@ -17,17 +17,20 @@ app = Flask(__name__)
 
 @app.route("/allocate", methods=['POST'])
 def allocate_endpoint():
-    session = get_session()
-    repo = repository.SqlAlchemyRepository(session)
-    line = model.OrderLine(
-        request.json['orderid'],
-        request.json['sku'],
-        request.json['qty'],
-    )
     try:
-        batchref = handlers.allocate(line, repo, session)
-    except (model.OutOfStock, handlers.InvalidSku) as e:
-        return jsonify({'message': str(e)}), 400
+        event = events.AllocationRequired(
+            request.json['orederid'],
+            request.json['sku'],
+            request.json['qty'],
+        )
+        batchref = handlers.allocate(
+            event,
+            unit_of_work.SqlAlchemyUnitOfWork(),
+        )
+        results = messagebus.handle(event, unit_of_work.SqlAlchemyUnitOfWork())
+        batchref = results.pop(0)
+    except InvalidSkuError as e:
+        raise Exception(e)
 
     return jsonify({'batchref': batchref}), 201
 
