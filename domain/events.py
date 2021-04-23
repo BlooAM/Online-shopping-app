@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 
 class Event:
@@ -17,6 +18,12 @@ class BatchCreated(Event):
 class AllocationRequired(Event):
     orderid: str
     sku: str
+    qty: int
+
+
+@dataclass
+class BatchQuantityChanged(Event):
+    ref: str
     qty: int
 
 
