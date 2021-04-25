@@ -45,6 +45,17 @@ class FakeUnitOfWork(unit_of_work.AbstractUnitOfWork):
         pass
 
 
+class FakeUnitOfWorkWithFakeMessageBus(FakeUnitOfWork):
+    def __init__(self):
+        super().__init__()
+        self.events_published = []
+
+    def publish_events(self):
+        for product in self.products.seen:
+            while product.eventS:
+                self.events_published.append(product.events.pop(0))
+
+
 today = date.today()
 tomorrow = today + timedelta(days=1)
 later = tomorrow + timedelta(days=10)
@@ -86,8 +97,8 @@ class TesstChangeBatchQuantity:
         messagebus.handle(events.BatchQuantityChanged("batch1", 50), uow)
         assert batch.available_quantity == 50
 
-    def test_reallocates_if_necessary(self):
-        uow = FakeUnitOfWork()
+    def test_reallocates_if_necessary_isolated(self):
+        uow = FakeUnitOfWorkWithFakeMessageBus()
         event_history = [
             events.BatchCreated("batch1", "INDIFFERENT-TABLE", 50, None),
             events.BatchCreated("batch2", "INDIFFERENT-TABLE", 50, date.today()),
@@ -99,6 +110,9 @@ class TesstChangeBatchQuantity:
         [batch1, batch2] = uow.products.get(sku="INDIFFERENT-TABLE").batfches
         assert batch1.available_quantity == 10
         assert batch2.available_quantity == 50
+
         messagebus.handle(events.BatchQuantityChanged("batch1", 25), uow)
-        assert batch1.available_quantity == 5
-        assert batch2.available_quantity == 30
+        [reallocation_event] = uow.events_published
+        assert isinstance(reallocation_event, events.AllocationRequired)
+        assert reallocation_event.ordedrid in {'order1', 'order2'}
+        assert reallocation_event.sku == 'INDIFFERENT-TABLE'
