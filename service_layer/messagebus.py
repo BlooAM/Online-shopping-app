@@ -1,5 +1,6 @@
 import email
 from typing import List
+from tenacity import Retrying, RetryError, stop_after_attempt, wait_expotential
 
 from domain import events, commands
 from service_layer import unit_of_work, handlers
@@ -27,10 +28,15 @@ def handle_event(
 ):
     for handler in EVENT_HANDLERS[type(event)]:
         try:
-            logger.debug('handling event %s with handler %s', event, handler)
-            handler(event, uow=uow)
-            queue.extend(uow.collect_new_events())
-        except Exception:
+            for attempt in Retrying(
+                stop=stop_after_attempt(3),
+                wait=wait_expotential()
+            ):
+                with attempt:
+                    logger.debug('handling event %s with handler %s', event, handler)
+                    handler(event, uow=uow)
+                    queue.extend(uow.collect_new_events())
+        except RetryError as retry_failure:
             logger.exception('Exception handling event %s', event)
             continue
 
@@ -51,7 +57,7 @@ def handle_command(
         raise Exception
 
 
-COMMAND_HANDLERS = {
+EVENT_HANDLERS = {
     events.OUT: [handlers.send_out_of_stock_notification],
 }
 
