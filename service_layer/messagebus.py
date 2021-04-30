@@ -2,9 +2,15 @@ import email
 from typing import List
 from tenacity import Retrying, RetryError, stop_after_attempt, wait_expotential
 
+from adapters import redis_eventpublisher
 from domain import events, commands
 from service_layer import unit_of_work, handlers
 
+
+def publish_allocated_event(
+        event: events.Allocated, uow: unit_of_work.AbstractUnitOfWork
+):
+    redis_eventpublisher.publish('line_allocated', event)
 
 def handle(message: Message, uow: unit_of_work.AbstractUnitOfWork):
     results = []
@@ -58,7 +64,8 @@ def handle_command(
 
 
 EVENT_HANDLERS = {
-    events.OUT: [handlers.send_out_of_stock_notification],
+    events.Allocated: [handlers.publish_allocated_event],
+    events.OutOfStock: [handlers.send_out_of_stock_notification],
 }
 
 COMMAND_HANDLERS = {
