@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 import config
 from domain import model, events
 from adapters import orm, repository
+from allocations import views
 from service_layer import handlers, unit_of_work, messagebus
 
 
@@ -46,3 +47,12 @@ def add_batch():
         request.json['ref'], request.json['sku'], request.json['qty'], eta, repo, session
     )
     return 'OK', 201
+
+
+@app.route("/allocations/<orderid>", methods=['GET'])
+def allocations_view_endpoint(orderid):
+    uow = unit_of_work.SqlAlchemyUnitOfWork()
+    result = views.allocations(orderid, uow)
+    if not result:
+        return 'not found', 404
+    return jsonify(result), 200
