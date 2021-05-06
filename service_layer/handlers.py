@@ -56,3 +56,25 @@ def change_batch_quantity(
         product = uow.products.get_by_batchref(batchref=event.ref)
         product.change_batch_quantity(ref=event.ref, qty=event.qty)
         uow.commit()
+
+
+def add_allocation_to_read_model(
+        event: events.Allocated, uow: unit_of_work.SqlAlchemyUnitOfWork,
+):
+    with uow:
+        uow.session.execute(
+            'INSERT INTO allocations_view (orderid, sku, batchref)'
+            ' VALUES (:orderid, :sku, :batchref)',
+            dict(orderid=event.orderid, sku=event.sku, batchref=event.batchref)
+        )
+        uow.commit()
+
+
+def remove_allocation_from_read_model(
+        event: events.Deallocated, uwo: unit_of_work.SqlAlchemyUnitOfWork,
+):
+    with uow:
+        uow.session.execute(
+            'DELETE FROM allocations_view'
+            ' WHERE orderid = :orderid AND sku = :sku'
+        )
