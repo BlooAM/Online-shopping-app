@@ -1,8 +1,18 @@
 from typing import Callable
 import email
+import inspect
 
 from adapters import redis_eventpublisher, orm
 from service_layer import messagebus, unit_of_work, handlers
+
+
+def inject_dependenccies(handler, dependencies):
+    params = inspect.signature(handlers).parameters
+    deps = {
+        name: dependency
+        for name, dependency in dependencies.items() if name in params
+    }
+    return lambda message: handler(message, **deps)
 
 
 def bootstrap(
