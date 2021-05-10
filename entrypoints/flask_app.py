@@ -7,13 +7,12 @@ from sqlalchemy.orm import sessionmaker
 import config
 from domain import model, events
 from adapters import orm, repository
-from allocations import views
+from allocation import bootstrap, views
 from service_layer import handlers, unit_of_work, messagebus
 
 
-orm.start_mappers()
-get_session = sessionmaker(bind=create_engine(config.get_postgres_uri()))
 app = Flask(__name__)
+bus = bootstrap.bootstrap()
 
 
 @app.route("/allocate", methods=['POST'])
