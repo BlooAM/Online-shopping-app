@@ -2,7 +2,7 @@ from typing import Callable
 import email
 import inspect
 
-from adapters import redis_eventpublisher, orm
+from adapters import redis_eventpublisher, orm, notifications
 from service_layer import messagebus, unit_of_work, handlers
 
 
@@ -18,7 +18,7 @@ def inject_dependenccies(handler, dependencies):
 def bootstrap(
         start_orm: bool = True,
         uwo: unit_of_work.AbstractUnitOfWork = unit_of_work.SqlAlchemyUnitOfWork(),
-        send_mail: Callable = email.send,
+        notifications: notifications.AbstractNotifications = notifications.EmailNotification(),
         publish: Callable = redis_eventpublisher.publish,
 ) -> messagebus.MessageBus:
     if start_orm:

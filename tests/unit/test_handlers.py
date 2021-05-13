@@ -1,9 +1,11 @@
-import pytest
 from datetime import date, timedelta
+from collections import defaultdict
+import pytest
 
-from adapters import repository
+from allocation import bootstrap
+from adapters import repository, notifications
 from domain.model import Batch, OrderLine, allocate, OutOfStock
-from domain import model, events
+from domain import model, events, commands
 from service_layer import handlers, unit_of_work, messagebus
 
 
@@ -56,6 +58,14 @@ class FakeUnitOfWorkWithFakeMessageBus(FakeUnitOfWork):
                 self.events_published.append(product.events.pop(0))
 
 
+class FakeNotification(notifications.AbstractNotification):
+    def __init__(self):
+        self.sent = defaultdict(list) #type: Dict[str, List[str]]
+
+    def send(self, destination, message):
+        self.sent[destination].append(message)
+
+
 today = date.today()
 tomorrow = today + timedelta(days=1)
 later = tomorrow + timedelta(days=10)
@@ -84,6 +94,20 @@ class TestAllocate:
             events.AllocationRequired("o1", "COMPLICATED-LAMP", 10), uow
         )
         assert result == "batch1"
+
+    def test_sends_email_on_out_of_stock_error(self):
+        fake_notifs = FakeNotification()
+        bus = bootstrap.bootstrap(
+            start_orm=False,
+            uow=FakeUnitOfWork(),
+            notifications=fake_notifs,
+            publish=lambda *args: None,
+        )
+        bus.handle(commands.CreateBatch("b1", "POPULAR-CURTAINS", 9, None))
+        bus.handle(commands.Allocate("o1", "POPULAR-CURTAINS", 10, None))
+        assert fake_notifs.send['stock@made.com'] == [
+            f'No available product: POPULAR-CURTAINS',
+        ]
 
 
 class TesstChangeBatchQuantity:
