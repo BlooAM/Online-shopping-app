@@ -1,0 +1,23 @@
+version: "3"
+
+services:
+  redis_pubsub:
+    build:
+      context: .idea
+      dockerfile: Dockerfile
+    image: allocation-image
+
+  api:
+    image: allocation-image
+
+  postgres:
+    image: postgres:9.6
+
+  redis:
+    image: redis:alpine
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      -"11025:1025"
+      -"18025:8025"
